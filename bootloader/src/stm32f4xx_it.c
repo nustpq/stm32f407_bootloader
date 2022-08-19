@@ -29,7 +29,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_it.h"
-
+#include "uart.h"
 /** @addtogroup Template_Project
   * @{
   */
@@ -132,9 +132,9 @@ void DebugMon_Handler(void)
 void PendSV_Handler(void)
 {
 }
-void USART3_IRQHandler(void)
+void USART1_IRQHandler(void)
 {
-  USART3_IRQ_Callback();
+  USART1_IRQ_Callback();
 }
 /**
   * @brief  This function handles SysTick Handler.

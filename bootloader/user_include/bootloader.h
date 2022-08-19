@@ -1,5 +1,6 @@
-#ifndef __BL_enum_H_
-#define __BL_enum_H_
+#ifndef __BOOTLOADER_H__
+#define __BOOTLOADER_H__
+
 #include"uart.h"
 #include "stm32f4xx.h"
 #include"stm32f4xx_flash.h"
@@ -10,26 +11,30 @@
 #define  APP_START_ADDRESS  *((volatile uint32_t*) (IMAGE_SADDR ))
 
  //32bit buffer indicates "upgrade" request when application runs
-#define  COMMON_BUF   __attribute__ ((section (".no_init_ram")))  volatile uint32_t
+//#define  COMMON_BUF   __attribute__ ((section (".no_init_ram")))  volatile uint32_t
+#define  COMMON_BUF   __attribute__ ((at(0x2001FC00))) volatile uint32_t
 
 //commands used by image supplier and bootloader during communication
 
-#define ACK        0x79
-#define NACK       0x1F
-#define CMD_GETID  0x02
-#define CMD_WRITE  0x2b
-#define CMD_ERASE  0x43
-#define CMD_Jump   0x44
-#define CMD_wr_p   0x33
-#define RE_wr_pr   0x55
-#define up_date    0x66
+#define  ACK          0x55
+#define  NACK         0xAA
+#define  CMD_GETID    0x90
+#define  CMD_ERASE    0xA1
+#define  CMD_WRITE    0xB2
+#define  CMD_UPDATE   0xC3
+#define  CMD_JUMP     0xD4
+#define  CMD_WP_ON    0xE5
+#define  CMD_WP_OFF   0xF6
+       
+#define  KEY_UPDATE       0xA0A0B0B0       
+#define  UART1_BAUD       115200
 
 void boot_process(void);
 void cmdErase(uint8_t*pucData);
 void cmdWrite(uint8_t *pucData);
 void cmdjump(uint8_t*p);
-void wr_prot(uint8_t*p);
-void Re_wr_prot(uint8_t*p);
+void write_prot(uint8_t*p);
+void Remove_wr_prot(uint8_t*p);
 void update(uint8_t*p);
 
 #endif

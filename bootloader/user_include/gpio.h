@@ -3,5 +3,11 @@
 #include <stddef.h>
 #include "stm32f4xx.h"
 #include "stm32f4xx.h"
-void USART3_GPIO_Config(void);
+
+#define LED_OFF   GPIO_SetBits(GPIOG,GPIO_Pin_6)
+#define LED_ON    GPIO_ResetBits(GPIOG,GPIO_Pin_6)
+
+void USART1_GPIO_Config(void);
+void led_init(void);
+
 #endif

@@ -23,7 +23,7 @@ static void sys_init (void){
 					  RCC->AHB1RSTR = 0;
 
 					  /* Reset USART3 */
-					  RCC->APB1RSTR = RCC_APB1RSTR_USART3RST;
+					  RCC->APB1RSTR = RCC_APB1RSTR_USART3RST; //PQ  TODO ??
 
 					  /* Release reset */
 					  RCC->APB1RSTR = 0;
@@ -93,14 +93,16 @@ static void sys_init (void){
  *
  */
 void jump_to_exist_app(uint32_t* app_start_addess){
-			sys_init();
-	       SCB->VTOR = (uint32_t)app_start_addess;
-			 __DSB();
-			 void (*jump_to_bl)(void) = (void *)(*((uint32_t *)(app_start_addess + 4)));//Set fun_pointer pointing to image reset handler
+    __disable_irq();
+    __set_FAULTMASK(1);
+    sys_init();
+    SCB->VTOR = (uint32_t)app_start_addess;
+    __DSB();
+    void (*jump_to_bl)(void) = (void *)(*((uint32_t *)(app_start_addess + 1)));//Set fun_pointer pointing to image reset handler
 
-	   /* Set stack pointer */
-	        __set_MSP(*(volatile uint32_t*)app_start_addess);
-	         jump_to_bl();//de-reference fun_ptr to execute image reset handler
+    /* Set stack pointer */
+    __set_MSP(*(volatile uint32_t*)app_start_addess);
+    jump_to_bl();//de-reference fun_ptr to execute image reset handler
 
 }
 
@@ -114,32 +116,29 @@ void jump_to_exist_app(uint32_t* app_start_addess){
  *
  * */
 oper_statues jump_to_new_app(uint32_t *app_start_addess, void (* ACKNOWLEDGE)()){
-	             /* Check if it has valid stack pointer in the RAM */
-			    if(check_MSP(app_start_addess))
-			    {
-			    	ACKNOWLEDGE(__ACK);
-			    	sys_init();
-			    	SCB->VTOR = (uint32_t)app_start_addess;
-			    	__DSB();
-			    	void (*jump_address)(void) = (void *)(*((uint32_t *)(app_start_addess + 4)));
+        /* Check if it has valid stack pointer in the RAM */
+    if(check_MSP(app_start_addess))
+    {
+        ACKNOWLEDGE(__ACK);
+        __disable_irq();
+        __set_FAULTMASK(1);				
+        SCB->VTOR = (uint32_t)app_start_addess;
+        __DSB();
+            
+        void (*jump_address)(void) = (void *)(*((uint32_t *)(app_start_addess + 1)));
 
-			    	/* Set stack pointer */
-			    	__set_MSP(*(uint32_t*)(app_start_addess));
+        /* Set stack pointer */
+        __set_MSP(*(uint32_t*)(app_start_addess));
 
-			    	/* Jump */
-			    	jump_address();
+        /* Jump */
+        jump_address();
 
-			     }
-			    else
-			    {
-			    	ACKNOWLEDGE(__NACK);
-			    	return __FAILED;
+    }
+    else
+    {
+        ACKNOWLEDGE(__NACK);
+        return __FAILED;
 
-			     }
-
-
-
-
-
+    }
 
 }
