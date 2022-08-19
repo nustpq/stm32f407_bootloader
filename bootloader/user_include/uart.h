@@ -1,16 +1,19 @@
 #ifndef __uart_enum_H_
 #define __uart_enum_H_
+#include <stdint.h>
+
 typedef enum
 {
-  USART3_NO_cmd,
-  USART3_CMD_RECEIVED,
+  USART_CMD_NONE,
+  USART_CMD_RECEIVED,
 
-} USART3_cmd_StatusType;
-#define MAX_BUFFER_LENGTH                     ((uint32_t) 200u)
-void USART3_Init(void);
-void USART3_Enable(void);
+} USART_CMD_STATUS_TYPE;
+
+#define MAX_BUFFER_LENGTH            ((uint32_t) 200u)
+void USART1_Init(uint32_t baud);
+void USART1_Enable(void);
 void NVIC_Int(void);
-void USART3_IRQ_Callback(void);
-//void USART3_Process(void);
-void strTransmit(const char data);
+void USART1_IRQ_Callback(void);
+//void USART1_Process(void);
+void USART1_SendChar(const char data);
 #endif

@@ -1,24 +1,16 @@
 from __future__ import print_function
-
 import sys, serial, binascii, time, struct, argparse
-
 from intelhex import IntelHex
-
-
-
-
-
 
 ACK       = 0x79
 NACK      = 0x1F
 CMD_ERASE = 0x43
 CMD_GETID = 0x02
 CMD_WRITE = 0x2b
-CMD_jump  = 0x44
-CMD_wr_p  = 0x33
-RE_wr_pr  = 0x55
-up_date   = 0x66
-
+CMD_JUMP  = 0x44
+CMD_WP_EN  = 0x33
+CMD_WP_DISABLE  = 0x55
+CMD_UPDATE   = 0x66
 
 
 class ProgramModeError(Exception):
@@ -28,15 +20,10 @@ class TimeoutError(Exception):
     pass
 
 class STM32Flasher(object):
-    def __init__(self, serialPort, baudrate=38400):
-        self.serial = serial.Serial(serialPort, baudrate=baudrate, timeout=30)
-    
+    def __init__(self, serialPort, baudrate=115200):
+        self.serial = serial.Serial(serialPort, baudrate=baudrate, timeout=10)
 	
-	
-    def _sstr_(self,data):
-       
-       
-		
+    def _sstr_(self,data):       	
         self.serial.write(data)
         ky = input("press any key to start\n")
       
@@ -57,21 +44,21 @@ class STM32Flasher(object):
     def _create_cmd_message(self, msg):
         #Encodes a command adding the CRC32
         cmd = list(msg) + list(struct.pack("I", self._crc_stm32(msg)))
-        return cmd
-    
+        return cmd    
 	
     def _write_protection(self, sector):
         self.serial.flushInput()
-        self.serial.write(self._create_cmd_message((CMD_wr_p,sector)))
+        self.serial.write(self._create_cmd_message((CMD_WP_EN,sector)))
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
                 raise ProgramModeError("Can't remove write protection")
         else:
             raise TimeoutError("Timeout error")
+
     def _Re_write_protection(self, sector):
         self.serial.flushInput()
-        self.serial.write(self._create_cmd_message((RE_wr_pr,sector)))
+        self.serial.write(self._create_cmd_message((CMD_WP_DISABLE,sector)))
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
@@ -81,16 +68,19 @@ class STM32Flasher(object):
 	
     def _jump(self, address):
         self.serial.flushInput()
-        self.serial.write(self._create_cmd_message(([CMD_jump] +map(ord, struct.pack("I", address)))))
+        #self.serial.write(self._create_cmd_message(([CMD_JUMP] +map(ord, struct.pack("I", address)))))
+        self.serial.write(self._create_cmd_message([CMD_JUMP] + list( struct.pack("I", address))))
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
                 raise ProgramModeError("Can't jump")
         else:
             raise TimeoutError("Timeout error")
+
     def _update(self, address):
         self.serial.flushInput()
-        self.serial.write(self._create_cmd_message(([up_date] +map(ord, struct.pack("I", address)))))
+        #self.serial.write(self._create_cmd_message(([CMD_UPDATE] +map(ord, struct.pack("I", address)))))
+        self.serial.write(self._create_cmd_message([CMD_UPDATE] + list( struct.pack("I", address))))
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
@@ -100,16 +90,16 @@ class STM32Flasher(object):
 
     def eraseFLASH(self, nsectors):
         #Sends an CMD_ERASE to the bootloader
+        if nsectors > 11:
+            raise TimeoutError("sector invalid!") 
         self.serial.flushInput()
-        self.serial.write(self._create_cmd_message((CMD_ERASE,nsectors)))
+        self.serial.write(self._create_cmd_message((CMD_ERASE,nsectors<<3)))
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
                 raise ProgramModeError("Can't erase FLASH")
         else:
-            raise TimeoutError("Timeout error")
-      
-    
+            raise TimeoutError("Timeout error") 
 
     def writeImage(self, filename):
         #Sends an CMD_WRITE to the bootloader
@@ -119,9 +109,9 @@ class STM32Flasher(object):
         ih = IntelHex()  
         ih.loadhex(filename)
         yield {"saddr": ih.minaddr(), "eaddr": ih.maxaddr()}
-        global sad
+        global start_address
         addr = ih.minaddr()
-        sad=addr
+        start_address = addr
         content = ih.todict()
         abort = False
         resend = 0
@@ -140,10 +130,19 @@ class STM32Flasher(object):
             try:
                 if resend >= 3:
                      abort = True
+                     print("Error: resend >= 3")
                      break
 
                 self.serial.flushInput()
-                self.serial.write(self._create_cmd_message([CMD_WRITE] +map(ord, struct.pack("I", saddr))))
+                #flasher.eraseFLASH(2)
+                #input()
+                #a = map(ord, struct.pack("I", saddr))
+                #print(f"saddr: {saddr}")
+                # print(type(saddr))
+                # b= struct.pack("I", saddr)
+                # print(list(b))
+                # print(type(b[1]),int(b[1]))
+                self.serial.write(self._create_cmd_message([CMD_WRITE] + list( struct.pack("I", saddr))))
                 ret = self.serial.read(1)
                 if len(ret) == 1:
                     if struct.unpack("b", ret)[0] != ACK:
@@ -164,88 +163,92 @@ class STM32Flasher(object):
                 resend = 0
             except (TimeoutError, ProgramModeError):
                 resend +=1
+            print("+++")
+            #input()
 
         yield {"success": not abort}
+
 
 
 if __name__ == '__main__':
     eraseDone = 0
     
-    parser = argparse.ArgumentParser(
-        description='Loads a IntelHEX binary file using the custom bootloader described in the "MasteringSTM32 book')
-
-    parser.add_argument('com_port', metavar='com_port_path', type=str,
-                        help="Serial port ('/dev/tty.usbxxxxx' for UNIX-like systems or 'COMx' for Windows")
-
-    parser.add_argument('hex_file', metavar='hex_file_path', type=str,
-                        help="Path to the IntelHEX file containing the firmware to flash on the target MCU")
-
+    parser = argparse.ArgumentParser(description='Loads a IntelHEX binary file using the custom bootloader described in the "MasteringSTM32 book')
+    parser.add_argument('com_port', metavar='com_port_path', type=str, help="Serial port ('/dev/tty.usbxxxxx' for UNIX-like systems or 'COMx' for Windows")
+    parser.add_argument('hex_file', metavar='hex_file_path', type=str, help="Path to the IntelHEX file containing the firmware to flash on the target MCU")
     args = parser.parse_args()
 
     def doErase(arg):
-        global eraseDone
-        
+        global eraseDone        
     
-    flasher = STM32Flasher(args.com_port)
-    
-	
-    flasher._sstr_("s")
+    flasher = STM32Flasher(args.com_port)	
+    flasher._sstr_("s".encode())
    
-    print("\n\twant to upgrade the firmware?")
-    value = input("Please enter yes or No:\n")
-    if value == "yes":
-        print("Loading %s HEX file...." % args.hex_file)
+    print("\nwant to upgrade the firmware?")
+    #value = input("Please enter yes or No:\n")
 
-        
-        for e in flasher.writeImage(sys.argv[2]):
-            if "saddr" in e:
-                print("\tStart address: ", hex(e["saddr"]))
-                print("\tEnd address: ", hex(e["eaddr"]))
-            if "loc" in e:
-                if e["resend"] > 0:
-                   end = "\n"
-                else:
-                    end = ""
-                print("\r\tWriting address: %s --- %d" % (hex(e["loc"]), e["resend"]), end=end)
-                sys.stdout.flush()
+    #if value == "yes":
+    flasher.eraseFLASH(2)
+    input()
+    start_time = time.time()
+    print(f"Loading HEX file... {args.hex_file}")        
+    for e in flasher.writeImage(sys.argv[2]):
+        if "saddr" in e:
+            print("Start address: 0x%X" %e["saddr"])
+            print("End address  : 0x%X\n" %e["eaddr"])
+        if "loc" in e:
+            if e["resend"] > 0:
+                end = f' ReSend={e["resend"]}\n'
+            else:
+                end = ""
+            _time = time.time() - start_time
+            print("\rWriting address[0x%X]...  %ds" % (e["loc"],round(_time,0)), end=end)
+            sys.stdout.flush()
 
-            if "success" in e and e["success"]:
-                print("\n\tDone")
-                print("\tStart address: ", hex(sad))
-                print("\n\Erase last sector ")
-                if sad == 0x08020000:
-                    flasher.eraseFLASH(0x30)
-                if sad == 0x08040000:
-                    flasher.eraseFLASH(0x28)		
-                time.sleep(1)
-                eraseDone = 1				
-                print("Erasing Flash memory", end="") 
-                while eraseDone == 0:		
-                    print(".", end="")
-                    sys.stdout.flush()
-                    time.sleep(0.5)
-                flasher._update(sad)
-                print(" Done")				 
-            elif "success" in e and not e["success"]:
-                print("\n\tFailed to upload firmware")         
+        if "success" in e and e["success"]:
+            print("\nDone")
+             
+            print("Start address: ", hex(start_address))
+            # print("\n\Erase last sector ")
+            # if start_address == 0x08020000:
+            #     flasher.eraseFLASH(0x30)
+            # if start_address == 0x08040000:
+            #     flasher.eraseFLASH(0x28)		
+            # time.sleep(1)
+            # eraseDone = 1				
+            # print("Erasing Flash memory", end="") 
+            # while eraseDone == 0:		
+            #     print(".", end="")
+            #     sys.stdout.flush()
+            #     time.sleep(0.5)
+            # flasher._update(start_address)
+            # input()
+            # print(" Done")
+
+        elif "success" in e and not e["success"]:
+            print("\nFailed to upload firmware")         
             
-    print("\n\twant to add write protection?")
-    value = input("Please enter yes or No:\n")
-    if value == "yes":
-        print("\n\enter sector")
-        value = input("Please enter sector num\n")
-        flasher._write_protection(value)
-    else:
-        print("\n\ok")
-    print("\n\twant to remove write protection?")
-    value = input("Please enter yes or No:\n")
-    if value == "yes":
-        print("\n\enter sector")
-        value = input("Please enter sector num\n")
-        flasher._Re_write_protection(value)
-    else:
-        print("\n\ok")				
-    flasher._jump(sad)				
+    # print("\nwant to add write protection?")
+    # value = input("Please enter yes or No:\n")
+    # if value == "yes":
+    #     print("\n\enter sector")
+    #     value = input("Please enter sector num\n")
+    #     flasher._write_protection(value)
+    # else:
+    #     print("\n\ok")
+
+    # print("\nwant to remove write protection?")
+    # value = input("Please enter yes or No:\n")
+    # if value == "yes":
+    #     print("\n\enter sector")
+    #     value = input("Please enter sector num\n")
+    #     flasher._Re_write_protection(value)
+    # else:
+    #     print("\n\ok")	
+
+    print("Start App...")
+    time.sleep(2)
+    flasher._jump(start_address)				
 			
         
 	
