@@ -93,9 +93,9 @@ static void sys_init (void){
  *
  */
 void jump_to_exist_app(uint32_t* app_start_addess){
-    __disable_irq();
-    __set_FAULTMASK(1);
-    sys_init();
+    //__disable_irq();
+    //__set_FAULTMASK(1);
+    //sys_init();
     SCB->VTOR = (uint32_t)app_start_addess;
     __DSB();
     void (*jump_to_bl)(void) = (void *)(*((uint32_t *)(app_start_addess + 1)));//Set fun_pointer pointing to image reset handler
@@ -120,8 +120,8 @@ oper_statues jump_to_new_app(uint32_t *app_start_addess, void (* ACKNOWLEDGE)())
     if(check_MSP(app_start_addess))
     {
         ACKNOWLEDGE(__ACK);
-        __disable_irq();
-        __set_FAULTMASK(1);				
+        //__disable_irq();
+        //__set_FAULTMASK(1);				
         SCB->VTOR = (uint32_t)app_start_addess;
         __DSB();
             
