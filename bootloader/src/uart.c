@@ -41,7 +41,6 @@ void USART1_SendChar(char data)
 
 }
 
-
 int fputc(int ch, FILE *f)
 {
     USART1_SendChar((char) ch); 
@@ -55,7 +54,7 @@ void USART1_IRQ_Callback(void)
         (void)USART1->DR;
         //end of rx buffer
         RxBuffer[index]=0;
-        index=USART1->DR;
+        //index=USART1->DR;
         index=0;//clean to receive new cmd
         // set led and Set CMD status   
         LED_OFF;
@@ -123,40 +122,6 @@ void USART1_Init(uint32_t bound)
 	
 }
 
-// void USART1_Init(void)
-// {
-
-// 	 /* Enable USART1 clock */
-// 	  RCC->APB1ENR = RCC_APB1ENR_USART3EN;
-
-// 	  /* Select oversampling by 8 mode */
-// 	  USART1->CR1 &= ~USART_CR1_OVER8;
-
-// 	  /* Select one sample bit method */
-// 	  USART1->CR3 |= USART_CR3_ONEBIT;
-
-// 	  /* Select 1 Start bit, 8 Data bits, n Stop bit */
-// 	  USART1->CR1 &= ~USART_CR1_M;
-
-// 	  /* Select 1 stop bit */
-// 	  USART1->CR2 &= ~USART_CR2_STOP;
-
-// 	  /* disable parity control */
-// 	  USART1->CR1 &= ~USART_CR1_PCE;
-
-// 	  //set baudrate at 38.4kbs ,see page 986 at reference manual
-// 	  /*USARTDIV = Fpclk / (16 * baud_rate)
-// 	     *          = 42000000 / (16 * 38400) = 68.375
-// 	     *
-// 	     * DIV_Fraction = 16 * 0.375 = 0x6
-// 	     * DIV_Mantissa = 68 = 0x44
-// 	     *
-// 	     * BRR          = 0x446 */
-// 	      /* Write to USART BRR register */
-// 	      USART1->BRR = (uint16_t)0x446;
-
-// 	  //USART2->BRR = 0x2d8;
-// }
 
 void USART1_Enable(void)
 {

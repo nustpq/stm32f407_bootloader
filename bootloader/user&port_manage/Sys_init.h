@@ -8,8 +8,8 @@ typedef enum{
 }oper_statues;
 
 typedef enum{
-	__ACK=0x79,
-	__NACK=0x1F
+	__ACK=0x55,
+	__NACK=0xAA
 
 
 }cmd_oper;

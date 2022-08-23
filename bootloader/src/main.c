@@ -41,14 +41,14 @@ COMMON_BUF buf;
 int main(void)
 {
     __enable_irq();//enable interrupts which has been disabled by app before sw reset
-    if( APP_START_ADDRESS==FREE_IMAGE || buf==KEY_UPDATE)//Enter bootloader if no image founds or upgrade request has been received
+    if( APP_START_ADDRESS==FREE_IMAGE || buf==KEY_UPDATE )//Enter bootloader if no image founds or upgrade request has been received
     {
         buf=0;//Reset buffer indicating that the upgrade req has been processed
         boot_process();//enter bootloader
     }
     else
     {
-        jump_to_exist_app((uint32_t *)IMAGE_SADDR);
+        jump_to_exist_app((uint32_t*)APP_START_ADDRESS);
     }
 
 }

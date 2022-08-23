@@ -1,8 +1,10 @@
+#include <string.h>
 #include "bootloader.h"
 #include "stm32f4xx_gpio.h"
 #include "gpio.h"
 #include "uart.h"
-#include <string.h>
+#include "delay.h"
+
 
 unsigned char fw_version[]  = "[FW:V0.1]"; //fixed size string 
  
@@ -10,13 +12,15 @@ extern USART_CMD_STATUS_TYPE current_cmd_Status;//CMD received status which is d
 extern uint8_t RxBuffer[MAX_BUFFER_LENGTH + 1];//cmd buffer which is defined in uart.c
 
 void boot_process()
-{
-    unsigned int cnt = 0;
-    led_init();
+{  
     NVIC_Int();
+		delay_init(168); 
+		led_init();		
     USART1_Init(UART1_BAUD);    
     USART1_Enable();
-    RCC->AHB1ENR |= RCC_AHB1ENR_CRCEN;//enable crc  	
+    RCC->AHB1ENR |= RCC_AHB1ENR_CRCEN;//enable crc  
+		
+		delay_ms(500);	
     printf("Enter bootloader mode ...\r\n");
     printf("--  Bootloader version: %s\r\n", fw_version);  
     printf("--  Compiled on %s %s by PQ\r\n", __DATE__, __TIME__);
@@ -42,11 +46,11 @@ void boot_process()
                         cmdjump(RxBuffer);                        
                         break;
 
-                    case CMD_WP_EN:                        
+                    case CMD_WP_ON:                        
                         write_prot(RxBuffer);                        
                     break;
 
-                    case CMD_WP_DISABLE:                        
+                    case CMD_WP_OFF:                        
                         Remove_wr_prot(RxBuffer);                        
                     break;
 
@@ -56,10 +60,7 @@ void boot_process()
                 }
             case USART_CMD_NONE:                
                 LED_ON;
-                if( cnt++>5000*1000) {
-                    cnt=0;
-                    USART1_SendChar('+');
-                }
+
             break;            
         }		
     }
@@ -230,7 +231,7 @@ void update(uint8_t*p)
             USART1_SendChar(ACK);
             //save the new App address
             FLASH_Unlock();
-            FLASH_EraseSector(FLASH_Sector_2, VoltageRange_3);
+            FLASH_EraseSector(FLASH_Sector_1, VoltageRange_3);
             FLASH_Lock();
             FLASH_Unlock();
             FLASH_ProgramWord((uint32_t)(IMAGE_SADDR),address);

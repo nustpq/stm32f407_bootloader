@@ -2,16 +2,15 @@ from __future__ import print_function
 import sys, serial, binascii, time, struct, argparse
 from intelhex import IntelHex
 
-ACK       = 0x79
-NACK      = 0x1F
-CMD_ERASE = 0x43
-CMD_GETID = 0x02
-CMD_WRITE = 0x2b
-CMD_JUMP  = 0x44
-CMD_WP_EN  = 0x33
-CMD_WP_DISABLE  = 0x55
-CMD_UPDATE   = 0x66
-
+ACK    = 0x55
+NACK   = 0xAA
+CMD_GETID  = 0x90
+CMD_ERASE  = 0xA1
+CMD_WRITE  = 0xB2
+CMD_UPDATE = 0xC3
+CMD_JUMP   = 0xD4
+CMD_WP_ON  = 0xE5
+CMD_WP_OFF = 0xF6
 
 class ProgramModeError(Exception):
     pass
@@ -48,7 +47,7 @@ class STM32Flasher(object):
 	
     def _write_protection(self, sector):
         self.serial.flushInput()
-        self.serial.write(self._create_cmd_message((CMD_WP_EN,sector)))
+        self.serial.write(self._create_cmd_message((CMD_WP_ON,sector)))
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
@@ -58,7 +57,7 @@ class STM32Flasher(object):
 
     def _Re_write_protection(self, sector):
         self.serial.flushInput()
-        self.serial.write(self._create_cmd_message((CMD_WP_DISABLE,sector)))
+        self.serial.write(self._create_cmd_message((CMD_WP_OFF,sector)))
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
@@ -73,7 +72,7 @@ class STM32Flasher(object):
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
-                raise ProgramModeError("Can't jump")
+                raise ProgramModeError(f"Can't jump.({data})")
         else:
             raise TimeoutError("Timeout error")
 
@@ -84,20 +83,23 @@ class STM32Flasher(object):
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
-                raise ProgramModeError("Can't update")
+                raise ProgramModeError(f"Can't update.({data})")
         else:
             raise TimeoutError("Timeout error")
 
     def eraseFLASH(self, nsectors):
         #Sends an CMD_ERASE to the bootloader
+        print(f"erasing sector[{nsectors}]...")
         if nsectors > 11:
             raise TimeoutError("sector invalid!") 
+        if nsectors == 0:
+            raise TimeoutError("sector 0 is reserved for bootloader!") 
         self.serial.flushInput()
         self.serial.write(self._create_cmd_message((CMD_ERASE,nsectors<<3)))
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
-                raise ProgramModeError("Can't erase FLASH")
+                raise ProgramModeError(f"Can't erase FLASH.({data})")
         else:
             raise TimeoutError("Timeout error") 
 
@@ -130,23 +132,15 @@ class STM32Flasher(object):
             try:
                 if resend >= 3:
                      abort = True
-                     print("Error: resend >= 3")
+                     print("\nError: resend >= 3")
                      break
 
-                self.serial.flushInput()
-                #flasher.eraseFLASH(2)
-                #input()
-                #a = map(ord, struct.pack("I", saddr))
-                #print(f"saddr: {saddr}")
-                # print(type(saddr))
-                # b= struct.pack("I", saddr)
-                # print(list(b))
-                # print(type(b[1]),int(b[1]))
+                self.serial.flushInput()        
                 self.serial.write(self._create_cmd_message([CMD_WRITE] + list( struct.pack("I", saddr))))
                 ret = self.serial.read(1)
                 if len(ret) == 1:
                     if struct.unpack("b", ret)[0] != ACK:
-                        raise ProgramModeError("Write abort")
+                        raise ProgramModeError(f"Write abort.({ret})")
                 else:
                     raise TimeoutError("Timeout error")
                 encdata =data# self._encryptMessage(data)
@@ -162,9 +156,7 @@ class STM32Flasher(object):
                 yield {"loc": saddr, "resend": resend}
                 resend = 0
             except (TimeoutError, ProgramModeError):
-                resend +=1
-            print("+++")
-            #input()
+                resend +=1         
 
         yield {"success": not abort}
 
@@ -185,12 +177,15 @@ if __name__ == '__main__':
     flasher._sstr_("s".encode())
    
     print("\nwant to upgrade the firmware?")
-    #value = input("Please enter yes or No:\n")
+    value = input("Please enter yes or No:\n")
 
-    #if value == "yes":
-    flasher.eraseFLASH(2)
-    input()
-    start_time = time.time()
+    if value == "yes":
+        print("\nErase app flash ...")
+        sect_list = [1,2,3,4,5,6,7]
+        for i in range(len(sect_list)) : #sector 0 is bootloader,need be reserved.
+            flasher.eraseFLASH(sect_list[i])    
+
+    start_time = time.time()   
     print(f"Loading HEX file... {args.hex_file}")        
     for e in flasher.writeImage(sys.argv[2]):
         if "saddr" in e:
@@ -198,7 +193,7 @@ if __name__ == '__main__':
             print("End address  : 0x%X\n" %e["eaddr"])
         if "loc" in e:
             if e["resend"] > 0:
-                end = f' ReSend={e["resend"]}\n'
+                end = f'\nReSend={e["resend"]}\n'
             else:
                 end = ""
             _time = time.time() - start_time
@@ -206,9 +201,8 @@ if __name__ == '__main__':
             sys.stdout.flush()
 
         if "success" in e and e["success"]:
-            print("\nDone")
-             
-            print("Start address: ", hex(start_address))
+            print("Done\n")             
+            print("Update start address: ", hex(start_address))
             # print("\n\Erase last sector ")
             # if start_address == 0x08020000:
             #     flasher.eraseFLASH(0x30)
@@ -221,9 +215,8 @@ if __name__ == '__main__':
             #     print(".", end="")
             #     sys.stdout.flush()
             #     time.sleep(0.5)
-            # flasher._update(start_address)
-            # input()
-            # print(" Done")
+            flasher._update(start_address)
+            print("Done\n")
 
         elif "success" in e and not e["success"]:
             print("\nFailed to upload firmware")         
@@ -247,7 +240,7 @@ if __name__ == '__main__':
     #     print("\n\ok")	
 
     print("Start App...")
-    time.sleep(2)
+    time.sleep(0.5)
     flasher._jump(start_address)				
 			
         

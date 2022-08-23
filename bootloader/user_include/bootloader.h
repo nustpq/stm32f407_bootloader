@@ -16,15 +16,15 @@
 
 //commands used by image supplier and bootloader during communication
 
-#define  ACK              0x79
-#define  NACK             0x1F
-#define  CMD_GETID        0x02
-#define  CMD_WRITE        0x2b
-#define  CMD_ERASE        0x43
-#define  CMD_JUMP         0x44
-#define  CMD_WP_EN        0x33
-#define  CMD_WP_DISABLE   0x55
-#define  CMD_UPDATE       0x66
+#define  ACK          0x55
+#define  NACK         0xAA
+#define  CMD_GETID    0x90
+#define  CMD_ERASE    0xA1
+#define  CMD_WRITE    0xB2
+#define  CMD_UPDATE   0xC3
+#define  CMD_JUMP     0xD4
+#define  CMD_WP_ON    0xE5
+#define  CMD_WP_OFF   0xF6
        
 #define  KEY_UPDATE       0xA0A0B0B0       
 #define  UART1_BAUD       115200
