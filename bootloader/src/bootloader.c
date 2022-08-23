@@ -6,21 +6,21 @@
 #include "delay.h"
 
 
-unsigned char fw_version[]  = "[FW:V0.1]"; //fixed size string 
+unsigned char fw_version[]  = "[FW:V0.2]"; //fixed size string 
  
 extern USART_CMD_STATUS_TYPE current_cmd_Status;//CMD received status which is defined in uart.c
-extern uint8_t RxBuffer[MAX_BUFFER_LENGTH + 1];//cmd buffer which is defined in uart.c
+extern uint8_t RxBuffer[MAX_BUFFER_LENGTH];//cmd buffer which is defined in uart.c
 
 void boot_process()
 {  
     NVIC_Int();
-		delay_init(168); 
-		led_init();		
+    delay_init(168); 
+    led_init();		
     USART1_Init(UART1_BAUD);    
     USART1_Enable();
     RCC->AHB1ENR |= RCC_AHB1ENR_CRCEN;//enable crc  
 		
-		delay_ms(500);	
+    delay_ms(500);	
     printf("Enter bootloader mode ...\r\n");
     printf("--  Bootloader version: %s\r\n", fw_version);  
     printf("--  Compiled on %s %s by PQ\r\n", __DATE__, __TIME__);
@@ -103,7 +103,7 @@ void cmdWrite(uint8_t*pucData)
     memcpy(&ulSaddr, pucData + 1, sizeof(uint32_t));
     memcpy(&ulCrc, pucData + 5, sizeof(uint32_t));
     uint32_t pulData[5];
-    uint32_t pullData[16]={0x55};
+    uint32_t pullData[256]={0x55};
     for(int i = 0; i < 5; i++)
         pulData[i] = pucData[i];
     CRC_ResetDR();
@@ -112,23 +112,30 @@ void cmdWrite(uint8_t*pucData)
     if(ulCrc==val)
     {
         CRC_ResetDR();
-        memset(RxBuffer, 0, 20*sizeof(char));
+        //memset(RxBuffer, 0, 20*sizeof(char));
         USART1_SendChar(ACK);
         while(current_cmd_Status==USART_CMD_NONE);//wait for the rest of command
         current_cmd_Status = USART_CMD_NONE;
-        memcpy(&ulCrc, pucData + 16, sizeof(uint32_t));
-        for(int i = 0; i < 16; i++)       
+        memcpy(&ulCrc, pucData + 256, sizeof(uint32_t));
+        for(int i = 0; i < 256; i++)       
             pullData[i] = pucData[i]; 
         CRC_ResetDR();
-        val=CRC_CalcBlockCRC((uint32_t*)pullData, 16);
+        val=CRC_CalcBlockCRC((uint32_t*)pullData, 256);
         if(ulCrc==val)
         {
             FLASH_Unlock();
-            for (uint8_t i = 0; i < 16; i++) 
+            for (int i = 0; i < 256; i++) 
             {
                 FLASH_ProgramByte(ulSaddr,pucData[i]);
                 ulSaddr += 1;
             }
+
+            //spped up 
+            // for (uint8_t i = 0; i < (128>>2); i++) 
+            // {
+            //     FLASH_ProgramWord(ulSaddr,pucData[i*4]);
+            //     ulSaddr += 4;
+            // }      
             FLASH_Lock();
             USART1_SendChar(ACK);
         } else {

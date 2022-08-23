@@ -9,7 +9,7 @@ typedef enum
 
 } USART_CMD_STATUS_TYPE;
 
-#define MAX_BUFFER_LENGTH            ((uint32_t) 200u)
+#define MAX_BUFFER_LENGTH            ((uint32_t) (256+16))
 void USART1_Init(uint32_t baud);
 void USART1_Enable(void);
 void NVIC_Int(void);
