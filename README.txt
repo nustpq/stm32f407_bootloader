@@ -1,4 +1,20 @@
 # stm32f407_bootloader
+Author : Jampage
+Email : nustpq@gmail.com
+Date  : 08.24.2022
+
+This program is based on the bootloader project from Abdurahman hamdi, thanks a lot !
+
+I just did some modification for my project:
+	- Changed the starting address location to sector1(0x8004000)
+	- Used fixed ram addr as comm_buf between bootloader and app
+	- Used 115200 bps UART1
+	- Speed up app update speed by a larger buffer.
+	- Add some startup info printf 
+	- Update python script accordingly
+
+
+############################################
 Author : Abdurahman hamdi
 Email : bg201540@gmail.com
 Date  : 10.2.2020

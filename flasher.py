@@ -121,7 +121,7 @@ class STM32Flasher(object):
             if not resend:
                 data = []
                 saddr = addr
-                for i in range(16):
+                for i in range(256):
                   try:
                       data.append(content[addr])
                   except KeyError:
@@ -143,7 +143,7 @@ class STM32Flasher(object):
                         raise ProgramModeError(f"Write abort.({ret})")
                 else:
                     raise TimeoutError("Timeout error")
-                encdata =data# self._encryptMessage(data)
+                encdata =data # self._encryptMessage(data)
                 self.serial.flushInput()
                 self.serial.write(self._create_cmd_message(data))
                 ret = self.serial.read(1)
@@ -186,7 +186,8 @@ if __name__ == '__main__':
             flasher.eraseFLASH(sect_list[i])    
 
     start_time = time.time()   
-    print(f"Loading HEX file... {args.hex_file}")        
+    print(f"Loading HEX file... {args.hex_file}")    
+        
     for e in flasher.writeImage(sys.argv[2]):
         if "saddr" in e:
             print("Start address: 0x%X" %e["saddr"])

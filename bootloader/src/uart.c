@@ -23,7 +23,7 @@ struct __FILE
 FILE __stdout;	/* FILE is typedef’ d in stdio.h. */
 
 static int index=0;
-uint8_t RxBuffer[MAX_BUFFER_LENGTH + 1];
+uint8_t RxBuffer[MAX_BUFFER_LENGTH ];
 static char RxChar = 0;
 
 USART_CMD_STATUS_TYPE current_cmd_Status = USART_CMD_NONE;//cmd receiving status
@@ -53,7 +53,7 @@ void USART1_IRQ_Callback(void)
     {   /* Read data register to clear idle line flag "cmd receiving has finished "*/
         (void)USART1->DR;
         //end of rx buffer
-        RxBuffer[index]=0;
+        //RxBuffer[index]=0;
         //index=USART1->DR;
         index=0;//clean to receive new cmd
         // set led and Set CMD status   
