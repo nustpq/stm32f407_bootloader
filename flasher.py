@@ -38,9 +38,12 @@ class STM32Flasher(object):
             print(ret_str)
             #print(len(ret_str))
             if 'Bootloader' not in ret_str:
-                raise ProgramModeError("Reboot MCU abort")
+                #raise ProgramModeError("Reboot MCU abort")
+                print("Reboot MCU abort")
         else:
-            raise TimeoutError("Timeout error")
+           # raise TimeoutError("Timeout error")
+            print("Reboot MCU abort")
+
 
       
     def _crc_stm32(self, data):
@@ -187,9 +190,9 @@ class STM32Flasher(object):
 if __name__ == '__main__':
     eraseDone = 0
     
-    parser = argparse.ArgumentParser(description='Loads a IntelHEX binary file using the custom bootloader described in the "MasteringSTM32 book')
-    parser.add_argument('com_port', metavar='com_port_path', type=str, help="Serial port ('/dev/tty.usbxxxxx' for UNIX-like systems or 'COMx' for Windows")
-    parser.add_argument('hex_file', metavar='hex_file_path', type=str, help="Path to the IntelHEX file containing the firmware to flash on the target MCU")
+    parser = argparse.ArgumentParser(description="Loads a Intel HEX file to update STM32F407 App firmare by bootloader")
+    parser.add_argument('com_port', metavar='com_port_path', type=str, help="Serial port ('COMx' for Windows or '/dev/tty.usbxxxxx' for Linux ")
+    parser.add_argument('hex_file', metavar='hex_file_path', type=str, help="Path to the Intel HEX file containing the firmware to update")
     args = parser.parse_args()
 
     def doErase(arg):
@@ -197,12 +200,12 @@ if __name__ == '__main__':
     
     flasher = STM32Flasher(args.com_port)	
 
-    input(f"\n\nPress any key to start update App to <{args.hex_file}>\n")
+    input(f"\nPress 'Enter' key to start updating '{args.hex_file}' to flash by [{args.com_port}] \n")
     start_time = time.time()  
     flasher.reboot_mcu()  #note: remove if no app running
     flasher._sstr_("s".encode())   
  
-    print("Erasing app flash sectors...")
+    print("\nErasing app flash sectors...")
     sect_list = [1,2,3,4,5,6,7]
     for i in range(len(sect_list)) : 
         flasher.eraseFLASH(sect_list[i])  
