@@ -30,7 +30,7 @@ class STM32Flasher(object):
             self.serial = serial.Serial(serialPort, baudrate=baudrate, timeout=2)
             self.update_cmd = list_cmd_update_v1            
         except :
-            print(f"ERROR: Failed to open {serialPort}.")            
+            print(f"Error: Failed to open {serialPort}.")            
     def _sstr_(self,data):       	
         self.serial.write(data)       
     
@@ -106,9 +106,14 @@ class STM32Flasher(object):
         self.serial.write(self._create_cmd_message((CMD_WP_ON,sector)))
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
-                raise ProgramModeError("Can't remove write protection")
+                #raise ProgramModeError("Can't remove write protection")
+                print("Error: No ACK") 
+                return False 
+            else:
+                return True           
         else:
-            raise TimeoutError("Timeout error")
+            #raise TimeoutError("Timeout error")
+            return False
 
     def _Re_write_protection(self, sector):
         self.serial.flushInput()
@@ -116,9 +121,14 @@ class STM32Flasher(object):
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
-                raise ProgramModeError("Can't remove write protection")
+                #raise ProgramModeError("Can't remove write protection")
+                print("Error: No ACK") 
+                return False 
+            else:
+                return True           
         else:
-            raise TimeoutError("Timeout error")
+            #raise TimeoutError("Timeout error")
+            return False
 	
     def _jump(self, address):
         print("Start run new App...")
@@ -141,25 +151,39 @@ class STM32Flasher(object):
         data = self.serial.read(1)
         if len(data) == 1:
             if struct.unpack("b", data)[0] != ACK:
-                raise ProgramModeError(f"Can't update.({data})")
+                #raise ProgramModeError(f"Can't update.({data})")
+                print("Error: No ACK") 
+                return False 
+            else:
+                return True           
         else:
-            raise TimeoutError("Timeout error")
+            #raise TimeoutError("Timeout error")
+            return False
 
     def eraseFLASH(self, nsectors):
         #Sends an CMD_ERASE to the bootloader
         print(f"Erasing sector {nsectors}...")
         if nsectors > 11:
-            raise TimeoutError("sector invalid!") 
+            #raise TimeoutError("sector invalid!")
+            print("Error: sector invalid!") 
+            return False
         if nsectors == 0: #sector 0 is bootloader, must be reserved.
-            raise TimeoutError("sector 0 is reserved for bootloader!") 
+            #raise TimeoutError("sector 0 is reserved for bootloader!") 
+            print("Error: Sector 0 is reserved for bootloader!") 
+            return False
         self.serial.flushInput()
         self.serial.write(self._create_cmd_message((CMD_ERASE,nsectors<<3)))
         data = self.serial.read(1)
-        if len(data) == 1:
+        if len(data) == 1: 
             if struct.unpack("b", data)[0] != ACK:
-                raise ProgramModeError(f"Can't erase FLASH.({data})")
+                #raise ProgramModeError(f"Can't erase FLASH.({data})")
+                print("Error: No ACK") 
+                return False 
+            else:
+                return True           
         else:
-            raise TimeoutError("Timeout error") 
+            #raise TimeoutError("Timeout error")
+            return False
 
     def writeImage(self, filename):
         #Sends an CMD_WRITE to the bootloader
@@ -223,7 +247,7 @@ class STM32Flasher(object):
 
 
 if __name__ == '__main__':
-    eraseDone = 0    
+    eraseDone = 0   
     parser = argparse.ArgumentParser(description="Loads a Intel HEX file to update STM32F407 App firmare by bootloader")
     parser.add_argument('com_port', metavar='com_port_path', type=str, help="Serial port ('COMx' for Windows or '/dev/tty.usbxxxxx' for Linux ")
     parser.add_argument('hex_file', metavar='hex_file_path', type=str, help="Path to the Intel HEX file containing the firmware to update")
@@ -234,9 +258,13 @@ if __name__ == '__main__':
     
     flasher = STM32Flasher(args.com_port)
     if flasher.serial==None:
-        raise ProgramModeError("Abort firmware updating.")   	
+        print("\nError: Abort firmware updating.") 
+        sys.exit()  	
     flasher.check_mcu_version()
-    input(f"\n<To avoid permanent damage, do NOT power off during updating!!!>\n\nPress 'Enter' key to start downloading [{args.hex_file}] via [{args.com_port}] \n")
+    print('+'*64)
+    print("+ To avoid permanent damage, do NOT power off during updating! +")
+    print('+'*64)
+    input(f"\nPress 'Enter' key to start downloading [{args.hex_file}] via [{args.com_port}] \n")
     start_time = time.time()  
     flasher.reboot_mcu()  #note: remove if no app running
     flasher._sstr_("s".encode())   
@@ -244,7 +272,12 @@ if __name__ == '__main__':
     print("\nErasing app flash sectors...")
     sect_list = [1,2,3,4,5,6,7]
     for i in range(len(sect_list)) : 
-        flasher.eraseFLASH(sect_list[i])  
+        ret = flasher.eraseFLASH(sect_list[i])  
+        if not ret:            
+            print("\nError: Abort firmware updating.") 
+            if i>0:
+                print("Error: App might have been damaged, need return to factory!") 
+            sys.exit()  
      
     print(f"\nLoading <{args.hex_file}> hex file... ")   
         
@@ -276,11 +309,15 @@ if __name__ == '__main__':
             #     print(".", end="")
             #     sys.stdout.flush()
             #     time.sleep(0.5)
-            flasher._update(start_address)
+            ret = flasher._update(start_address)
+            if not ret:
+                print("\nError: Update operation failed!")
+                sys.exit() 
             print("\nDone")
 
         elif "success" in e and not e["success"]:
-            print("\nFailed to upload firmware")         
+            print("\nError: Failed to download firmware!") 
+            break        
             
     # print("\nwant to add write protection?")
     # value = input("Please enter yes or No:\n")
@@ -301,7 +338,8 @@ if __name__ == '__main__':
     #     print("\n\ok")	
 
     time.sleep(0.5)
-    flasher._jump(start_address)				
+    flasher._jump(start_address)
+    print("Firmware update seccessfully!")				
 			
         
 	
