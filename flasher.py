@@ -2,8 +2,8 @@ from __future__ import print_function
 import sys, serial, binascii, time, struct, argparse
 from intelhex import IntelHex
 
-ACK    = 0x55
-NACK   = 0xAA
+ACK  = 0x55
+NACK = 0xAA
 CMD_GETID  = 0x90
 CMD_ERASE  = 0xA1
 CMD_WRITE  = 0xB2
@@ -12,7 +12,10 @@ CMD_JUMP   = 0xD4
 CMD_WP_ON  = 0xE5
 CMD_WP_OFF = 0xF6
 
-list_cmd_update = [0xEB ,0x00 ,0x07 ,0x77 ,0x77 ,0x07 ,0xF0]
+list_cmd_version   = [0xEB, 0x90, 0x00 ,0x07 ,0x00 ,0x07 ,0xF0]
+list_cmd_standby   = [0xEB, 0x90, 0x00 ,0x08 ,0x22 ,0x00 ,0x2A ,0xF0]
+list_cmd_update_v2 = [0xEB, 0x90, 0x00 ,0x08 ,0x77 ,0x77 ,0x08 ,0xF0]
+list_cmd_update_v1 = [0xEB ,0x00 ,0x07 ,0x77 ,0x77 ,0x07 ,0xF0]
 class ProgramModeError(Exception):
     pass
 
@@ -20,31 +23,63 @@ class TimeoutError(Exception):
     pass
 
 class STM32Flasher(object):
+    
     def __init__(self, serialPort, baudrate=115200):
-        self.serial = serial.Serial(serialPort, baudrate=baudrate, timeout=2)
-	
+        self.serial = None
+        try:
+            self.serial = serial.Serial(serialPort, baudrate=baudrate, timeout=2)
+            self.update_cmd = list_cmd_update_v1            
+        except :
+            print(f"ERROR: Failed to open {serialPort}.")            
     def _sstr_(self,data):       	
         self.serial.write(data)       
+    
+    def check_mcu_version(self):        
+        print("Check MCU FW Version...")
+        self.serial.write(self._create_cmd_message(list_cmd_standby))
+        time.sleep(0.1)
+        self.serial.flushInput()
+        self.serial.write(self._create_cmd_message(list_cmd_version))
+        ret = self.serial.read(20)      
+        if len(ret) > 0:  
+            #print(ret)
+            try:       
+                ret_str = str(ret, encoding = "utf-8")            
+                print(f"Current Version: {ret_str}")
+                if '[FW:V' in ret_str :
+                    self.update_cmd = list_cmd_update_v2
+                    return True
+                else:
+                    print("version format info not match.")
+                    return False
+            except :
+                print("Parse version info failed. FW < V3.0 detected.")
+                return False
+        else:           
+            print("Check MCU firmware version failed.")
+            return False
 
     def reboot_mcu(self):        
         print("Rebooting MCU ...")      
-        self.serial.write(self._create_cmd_message(list_cmd_update))
+        self.serial.write(self._create_cmd_message(self.update_cmd))
         time.sleep(0.2)
         self.serial.flushInput()
         ret = self.serial.read(100)        
-        if len(ret) > 0:   
-            #print(ret)         
-            ret_str = str(ret, encoding = "utf-8")
-            print(ret_str)
-            #print(len(ret_str))
-            if 'Bootloader' not in ret_str:
-                #raise ProgramModeError("Reboot MCU abort")
-                print("Reboot MCU abort")
+        if len(ret) > 0:              
+            try:
+                ret_str = str(ret, encoding = "utf-8")
+                if 'Bootloader' in ret_str: 
+                    return True
+                else:               
+                    print("Reboot MCU aborted.")
+                    return False
+            except :
+                print("Parse bootload info failed.")
+                return False
         else:
            # raise TimeoutError("Timeout error")
             print("Reboot MCU abort")
-
-
+            return False
       
     def _crc_stm32(self, data):
         #Computes CRC checksum using CRC-32 polynomial 
@@ -188,8 +223,7 @@ class STM32Flasher(object):
 
 
 if __name__ == '__main__':
-    eraseDone = 0
-    
+    eraseDone = 0    
     parser = argparse.ArgumentParser(description="Loads a Intel HEX file to update STM32F407 App firmare by bootloader")
     parser.add_argument('com_port', metavar='com_port_path', type=str, help="Serial port ('COMx' for Windows or '/dev/tty.usbxxxxx' for Linux ")
     parser.add_argument('hex_file', metavar='hex_file_path', type=str, help="Path to the Intel HEX file containing the firmware to update")
@@ -198,9 +232,11 @@ if __name__ == '__main__':
     def doErase(arg):
         global eraseDone        
     
-    flasher = STM32Flasher(args.com_port)	
-
-    input(f"\nPress 'Enter' key to start updating '{args.hex_file}' to flash by [{args.com_port}] \n")
+    flasher = STM32Flasher(args.com_port)
+    if flasher.serial==None:
+        raise ProgramModeError("Abort firmware updating.")   	
+    flasher.check_mcu_version()
+    input(f"\n<To avoid permanent damage, do NOT power off during updating!!!>\n\nPress 'Enter' key to start downloading [{args.hex_file}] via [{args.com_port}] \n")
     start_time = time.time()  
     flasher.reboot_mcu()  #note: remove if no app running
     flasher._sstr_("s".encode())   
