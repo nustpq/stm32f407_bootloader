@@ -50,13 +50,13 @@ class STM32Flasher(object):
                     self.update_cmd = list_cmd_update_v2
                     return True
                 else:
-                    print("version format info not match.")
+                    print("Error: Firmware version info format error.")#format error, '[FW:Vx.x]' should be included in version string.
                     return False
             except :
-                print("Parse version info failed. FW < V3.0 detected.")
+                print("Old version firmware(V2.x) detected.")#old version Master not support cmd_version, return voice data
                 return False
         else:           
-            print("Check MCU firmware version failed.")
+            print("Old version firmware(V2.x) detected.")#old version Slave not support cmd_version, no data return
             return False
 
     def reboot_mcu(self):        
