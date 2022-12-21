@@ -17,6 +17,7 @@ list_cmd_version   = [0xEB, 0x90, 0x00 ,0x07 ,0x00 ,0x07 ,0xF0]
 list_cmd_standby   = [0xEB, 0x90, 0x00 ,0x08 ,0x22 ,0x00 ,0x2A ,0xF0]
 list_cmd_update_v2 = [0xEB, 0x90, 0x00 ,0x08 ,0x77 ,0x77 ,0x08 ,0xF0]
 list_cmd_update_v1 = [0xEB ,0x00 ,0x07 ,0x77 ,0x77 ,0x07 ,0xF0]
+
 class ProgramModeError(Exception):
     pass
 
@@ -110,85 +111,58 @@ class STM32Flasher(object):
     def _write_protection(self, sector):
         data = self.send_cmder((CMD_WP_ON,sector),1)
         if len(data) == 1:
-            if struct.unpack("b", data)[0] != ACK:
-                #raise ProgramModeError("Can't remove write protection")
+            if struct.unpack("b", data)[0] != ACK:      
                 printc("No ACK",'ERROR')
                 return False 
             else:
                 return True           
-        else:
-            #raise TimeoutError("Timeout error")
+        else:         
             return False
 
     def _Re_write_protection(self, sector):
         data = self.send_cmder((CMD_WP_OFF,sector),1)
         if len(data) == 1:
-            if struct.unpack("b", data)[0] != ACK:
-                #raise ProgramModeError("Can't remove write protection")
+            if struct.unpack("b", data)[0] != ACK:       
                 printc("No ACK",'ERROR')
                 return False 
             else:
                 return True           
-        else:
-            #raise TimeoutError("Timeout error")
+        else:    
             return False
 	
     def _jump(self, address):
         print("Start run new App...")
         self.send_cmder([CMD_JUMP] + list( struct.pack("I", address)))  
-        #self.serial.flushInput()
-        #self.serial.write(self._create_cmd_message(([CMD_JUMP] +map(ord, struct.pack("I", address)))))
-        #self.serial.write(self._create_cmd_message([CMD_JUMP] + list( struct.pack("I", address))))
-        # data = self.serial.read(1)
-        # print(data)
-        # if len(data) == 1:
-        #     if struct.unpack("b", data)[0] != ACK:
-        #         raise ProgramModeError(f"Can't jump.({data})")
-        # else:
-        #     raise TimeoutError("Timeout error")
 
     def _update(self, address):
         print(f"Updating app start address... [{hex(start_address)}]") 
         data = self.send_cmder([CMD_UPDATE] + list( struct.pack("I", address)),1) 
-        #self.serial.flushInput()
-        #self.serial.write(self._create_cmd_message(([CMD_UPDATE] +map(ord, struct.pack("I", address)))))
-        #self.serial.write(self._create_cmd_message([CMD_UPDATE] + list( struct.pack("I", address))))
-        #data = self.serial.read(1)
         if len(data) == 1:
-            if struct.unpack("b", data)[0] != ACK:
-                #raise ProgramModeError(f"Can't update.({data})")
+            if struct.unpack("b", data)[0] != ACK:         
                 printc("No ACK",'ERROR')
                 return False 
             else:
                 return True           
-        else:
-            #raise TimeoutError("Timeout error")
+        else: 
             return False
 
     def eraseFLASH(self, nsectors):
         #Sends an CMD_ERASE to the bootloader
         print(f"Erasing sector {nsectors}...")
-        if nsectors > 11:
-            #raise TimeoutError("sector invalid!")
+        if nsectors > 11:      
             printc("Sector invalid!",'ERROR') 
             return False
-        if nsectors == 0: #sector 0 is bootloader, must be reserved.
-            #raise TimeoutError("sector 0 is reserved for bootloader!") 
+        if nsectors == 0: #sector 0 is bootloader, must be reserved.      
             printc("Sector 0 is reserved for bootloader!",'ERROR')
             return False
-        # self.serial.flushInput()
-        # self.serial.write(self._create_cmd_message((CMD_ERASE,nsectors<<3)))
-        # data = self.serial.read(1)
         data = self.send_cmder((CMD_ERASE,nsectors<<3),1) 
         if len(data) == 1: 
-            if struct.unpack("b", data)[0] != ACK:
-                #raise ProgramModeError(f"Can't erase FLASH.({data})")
+            if struct.unpack("b", data)[0] != ACK:          
                 printc("No ACK",'ERROR')
                 return False 
             else:
                 return True           
         else:
-            #raise TimeoutError("Timeout error")
             return False
 
     def writeImage(self, filename):
@@ -225,21 +199,14 @@ class STM32Flasher(object):
                 if resend >= 3:
                      abort = True
                      printc("Resend >= 3.",'ERROR')
-                     break
-
-                # self.serial.flushInput()        
-                # self.serial.write(self._create_cmd_message([CMD_WRITE] + list( struct.pack("I", saddr))))
-                # ret = self.serial.read(1)
+                     break   
                 ret = self.send_cmder([CMD_WRITE] + list( struct.pack("I", saddr)), 1) 
                 if len(ret) == 1:
                     if struct.unpack("b", ret)[0] != ACK:
                         raise ProgramModeError(f"Write abort.({ret})")
                 else:
                     raise TimeoutError("Timeout error")
-                encdata =data # self._encryptMessage(data)
-                # self.serial.flushInput()
-                # self.serial.write(self._create_cmd_message(data))
-                # ret = self.serial.read(1)
+                encdata =data # self._encryptMessage(data)      
                 ret = self.send_cmder(data, 1) 
                 if len(ret) == 1:
                     if struct.unpack("b", ret)[0] != ACK:
@@ -316,6 +283,7 @@ if __name__ == '__main__':
     for e in flasher.writeImage(sys.argv[2]):
         if "saddr" in e:
             print(f"Address Range:[ {hex(e['saddr'])} - {hex(e['eaddr'])} ]\n")
+            
         # if "loc" in e:
         #     if e["resend"] > 0:
         #         end = f'\nReSend={e["resend"]}\n'
