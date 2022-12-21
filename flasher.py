@@ -1,5 +1,5 @@
 from __future__ import print_function
-import sys, serial, binascii, time, struct, argparse, math
+import sys, serial, binascii, time, struct, argparse, math, zlib
 from intelhex import IntelHex
 from tqdm import tqdm, trange
 
@@ -18,11 +18,68 @@ list_cmd_standby   = [0xEB, 0x90, 0x00 ,0x08 ,0x22 ,0x00 ,0x2A ,0xF0]
 list_cmd_update_v2 = [0xEB, 0x90, 0x00 ,0x08 ,0x77 ,0x77 ,0x08 ,0xF0]
 list_cmd_update_v1 = [0xEB ,0x00 ,0x07 ,0x77 ,0x77 ,0x07 ,0xF0]
 
+# class bcolors:
+#     HEADER = '\033[95m'
+#     OKBLUE = '\033[94m'
+#     OKGREEN = '\033[92m'
+#     WARNING = '\033[5;30;43m'
+#     ERROR = '\033[5;37;41m'
+#     FAIL = '\033[91m'
+#     ENDC = '\033[0m'
+#     BOLD = '\033[1m'
+#     BOLD2 = '\033[1;34;40m'
+#     UNDERLINE = '\033[4m'
+
+bcolors = {
+    'HEADER': '\033[95m',
+    'ENDC': '\033[0m',
+    
+    'OKBLUE': '\033[94m',
+    'OKGREEN': '\033[92m',
+    'INFO': '\033[5;30;42m',
+    'WARN': '\033[5;30;43m',
+    'ERROR': '\033[5;37;41m',
+    'FAIL': '\033[91m',
+    'BOLD': '\033[1m',
+    'BOLD2': '\033[1;34;40m',
+    'UNDERLINE': '\033[4m',
+}
+def colorstr(info, color):
+    if color not in bcolors:
+        return info
+    return bcolors[color]+str(info)+bcolors['ENDC']
+
+def printc(info, type):
+    if type=='ERROR':
+        print(colorstr('Error','ERROR')+': '+str(info))
+    elif type=='WARN':
+        print(colorstr('Warning','WARN')+': '+str(info))
+    elif type=='INFO':
+        print(colorstr('Info','INFO')+': '+str(info) )
+    else:
+        print(str(info))
+        
 class ProgramModeError(Exception):
     pass
 
 class TimeoutError(Exception):
     pass
+
+#crc_time = 0 
+def crc_stm32(data_list):
+    #Computes CRC checksum using CRC-32 polynomial 
+    # global crc_time
+    # t0=time.time()
+    crc = 0xFFFFFFFF
+    for v in data_list:
+        crc ^= v
+        for i in range(32):
+            if crc & 0x80000000:
+                crc = (crc << 1) ^ 0x04c11db7 #Polynomial used in STM32
+            else:
+                crc = (crc << 1)
+    # crc_time+=time.time()-t0
+    return (crc & 0xFFFFFFFF)
 
 class STM32Flasher(object):
     
@@ -48,7 +105,7 @@ class STM32Flasher(object):
         return ret
     
     def check_mcu_version(self):        
-        print("Check MCU FW Version...")
+        print("Check MCU firmware version...")
         self.send_cmder(list_cmd_standby)
         time.sleep(0.1)        
         ret = self.send_cmder(list_cmd_version,20)   
@@ -56,7 +113,7 @@ class STM32Flasher(object):
             #print(ret)
             try:       
                 ret_str = str(ret, encoding = "utf-8")            
-                print(f"Current Version: {ret_str}")
+                print(colorstr(f"{ret_str}","OKGREEN"))
                 if '[FW:V' in ret_str :
                     self.update_cmd = list_cmd_update_v2
                     return True
@@ -88,24 +145,10 @@ class STM32Flasher(object):
            # raise TimeoutError("Timeout error")
             printc("Reboot MCU aborted.",'WARN')
             return False
-      
-    def _crc_stm32(self, data):
-        #Computes CRC checksum using CRC-32 polynomial 
-        crc = 0xFFFFFFFF
-
-        for d in data:
-            crc ^= d
-            for i in range(32):
-                if crc & 0x80000000:
-                    crc = (crc << 1) ^ 0x04C11DB7 #Polynomial used in STM32
-                else:
-                    crc = (crc << 1)
-
-        return (crc & 0xFFFFFFFF)
 
     def _create_cmd_message(self, msg):
         #Encodes a command adding the CRC32
-        cmd = list(msg) + list(struct.pack("I", self._crc_stm32(msg)))
+        cmd = list(msg) + list(struct.pack("I", crc_stm32(msg)))
         return cmd    
 	
     def _write_protection(self, sector):
@@ -183,7 +226,7 @@ class STM32Flasher(object):
         resend = 0
         pack_size = 256
         #while addr <= ih.maxaddr():
-        for i in trange(math.ceil((end_address-start_address)/pack_size),desc ='Downloading',unit='pack',dynamic_ncols=True, colour = 'green'):
+        for i in trange(math.ceil((end_address-start_address)/pack_size),desc ='Downloading',unit='p',dynamic_ncols=True, colour = 'green'):
             if not resend:
                 data = []
                 saddr = addr
@@ -222,35 +265,15 @@ class STM32Flasher(object):
         yield {"success": not abort}
 
 
-
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[5;30;43m'
-    ERROR = '\033[5;37;41m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    BOLD2 = '\033[1;34;40m'
-    UNDERLINE = '\033[4m'
-
-def printc(info, type="INFO"):
-    if type=='ERROR':
-        print(bcolors.ERROR+'Error'+bcolors.ENDC+': '+str(info))
-    elif type=='WARN':
-        print(bcolors.WARNING+'Warning'+bcolors.ENDC+': '+str(info))
-    else:
-        print(str(info))
         
         
 if __name__ == '__main__':
     print('+'*64)
-    print('+'+' '*22+bcolors.BOLD2+'固件COM更新工具 v3'+bcolors.ENDC+' '*22+'+')
-    print('+ To avoid permanent damage, '+bcolors.FAIL+'DO NOT '+bcolors.ENDC+'power off during updating! +')    
+    print('+'+' '*21+ colorstr('Firmware Updater V3','BOLD2') +' '*22+'+')
+    print('+ To avoid permanent damage, '+colorstr('DO NOT ','FAIL')+'power off during updating! +')    
     print('+'*64)    
-    eraseDone = 0   
-    parser = argparse.ArgumentParser(description="Loads a Intel HEX file to update STM32F407 App firmare by bootloader")
+    eraseDone = 0  
+    parser = argparse.ArgumentParser(description="Loads hex file to update STM32F407 App firmware via COM port by easy bootloader inside")
     parser.add_argument('com_port', metavar='com_port_path', type=str, help="Serial port ('COMx' for Windows or '/dev/tty.usbxxxxx' for Linux ")
     parser.add_argument('hex_file', metavar='hex_file_path', type=str, help="Path to the Intel HEX file containing the firmware to update")
     args = parser.parse_args()
@@ -268,7 +291,7 @@ if __name__ == '__main__':
     flasher.reboot_mcu()  #note: remove if no app running
     flasher._sstr_("s".encode())   
  
-    print("\nErasing app flash sectors...")
+    print("Erasing app flash sectors...")
     sect_list = [1,2,3,4,5,6,7]
     for i in range(len(sect_list)) : 
         ret = flasher.eraseFLASH(sect_list[i])  
@@ -337,7 +360,8 @@ if __name__ == '__main__':
 
     time.sleep(0.5)
     flasher._jump(start_address)
-    print("Firmware update successfully!")				
+    printc("Firmware update successfully!",'INFO')	
+    #print(crc_time)			
 			
         
 	
