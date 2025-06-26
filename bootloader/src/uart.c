@@ -49,9 +49,10 @@ int fputc(int ch, FILE *f)
 
 void USART1_IRQ_Callback(void)
 {
-    if((USART1->SR & USART_SR_IDLE) == USART_SR_IDLE)
+    uint16_t sr = USART1->SR;
+    if(( sr& USART_SR_IDLE) == USART_SR_IDLE)
     {   /* Read data register to clear idle line flag "cmd receiving has finished "*/
-        (void)USART1->DR;
+        USART1->DR;
         //end of rx buffer
         //RxBuffer[index]=0;
         //index=USART1->DR;
@@ -63,7 +64,7 @@ void USART1_IRQ_Callback(void)
     }
 
     /* Check USART receiver */
-    if((USART1->SR & USART_SR_RXNE) == USART_SR_RXNE)
+    if((sr& USART_SR_RXNE) == USART_SR_RXNE)
 	{
         // Read character
         RxChar = USART1->DR;

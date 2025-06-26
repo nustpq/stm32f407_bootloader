@@ -132,10 +132,10 @@ void DebugMon_Handler(void)
 void PendSV_Handler(void)
 {
 }
-void USART1_IRQHandler(void)
-{
-  USART1_IRQ_Callback();
-}
+//void USART1_IRQHandler(void)
+//{
+//  USART1_IRQ_Callback();
+//}
 /**
   * @brief  This function handles SysTick Handler.
   * @param  None

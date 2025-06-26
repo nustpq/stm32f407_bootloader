@@ -142,3 +142,4 @@ oper_statues jump_to_new_app(uint32_t *app_start_addess, void (* ACKNOWLEDGE)())
     }
 
 }
+

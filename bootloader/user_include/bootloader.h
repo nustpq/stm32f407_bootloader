@@ -18,17 +18,23 @@
 
 #define  ACK          0x55
 #define  NACK         0xAA
+
+#define  CMD_VERSION  0x8F
 #define  CMD_GETID    0x90
-#define  CMD_ERASE    0xA1
+#define  CMD_ERASE    0xA2
 #define  CMD_WRITE    0xB2
 #define  CMD_UPDATE   0xC3
 #define  CMD_JUMP     0xD4
 #define  CMD_WP_ON    0xE5
 #define  CMD_WP_OFF   0xF6
+
        
 #define  KEY_UPDATE       0xA0A0B0B0       
 #define  UART1_BAUD       115200
 
+#define LED_FREQ_IDLE    (3000*3000)  //led闪烁 3s，表示程序在跑
+
+void uart_cmd_parser(void);
 void boot_process(void);
 void cmdErase(uint8_t*pucData);
 void cmdWrite(uint8_t *pucData);
@@ -36,5 +42,6 @@ void cmdjump(uint8_t*p);
 void write_prot(uint8_t*p);
 void Remove_wr_prot(uint8_t*p);
 void update(uint8_t*p);
+void get_fw_verison(void);
 
 #endif
